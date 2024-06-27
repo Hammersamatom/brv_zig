@@ -28,11 +28,10 @@ fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
     const rs1: *u32 = &core_state.*.gp_regs[inst.r_type.rs1];
     const rs2: *u32 = &core_state.*.gp_regs[inst.r_type.rs2];
 
-    const jumped: bool = false;
+    var branched: bool = false;
 
     switch (inst.op_only.opcode) {
-        // REG, IMM
-        0b0110011, 0b0010011 => {
+        0b0110011, 0b0010011 => { // REG, IMM
             const rs2_or_imm: bool = if ((inst.op_only.opcode & 0x20) == 0x20) true else false;
             const value = if (rs2_or_imm) rs2.* else @as(u32, @bitCast(@as(i32, @bitCast(inst.instruction)) >> 20));
             switch (inst.r_type.funct3) {
@@ -54,8 +53,7 @@ fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
                 0x3 => rd.* = if (rs1.* < value) 1 else 0, // SLTIU (Set Less Than Immediate Unsigned)
             }
         },
-        // LOAD
-        0b0000011 => {
+        0b0000011 => { // LOAD
             // Can't you offset backwards?
             const ls_offset: u32 = rs1.* + @as(u32, @bitCast(@as(i32, @bitCast(inst.instruction)) >> 20));
             var t: component = .{ .word = 0 };
@@ -93,10 +91,10 @@ fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
                 else => return,
             }
         },
-        0b0100011 => {
+        0b0100011 => { // STORE
             var imm: un.imm_recon_s = undefined;
             imm.imm_s = .{ .imm4_0 = inst.s_type.imm4_0, .imm11_5 = inst.s_type.imm11_5 };
-            const ls_offset: u32 = rs1.* + @as(u12, @bitCast(imm.word_s));
+            const ls_offset: u32 = rs1.* + @as(u32, @bitCast(@as(i32, @intCast(imm.word_s))));
             const t: component = .{ .word = rs2.* };
 
             switch (inst.s_type.funct3) {
@@ -116,10 +114,44 @@ fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
                 else => return,
             }
         },
+        0b1100011 => { // BRANCH
+            const imm: un.imm_recon_b = un.imm_recon_b{
+                .imm_b = .{
+                    .imm12 = inst.b_type.imm12,
+                    .imm11 = inst.b_type.imm11,
+                    .imm10_5 = inst.b_type.imm10_5,
+                    .imm4_1 = inst.b_type.imm4_1,
+                    .unused_1 = 0,
+                },
+            };
+            switch (inst.b_type.funct3) {
+                0x0 => {
+                    if (rs1.* == rs2.*) branched = true;
+                },
+                0x1 => {
+                    if (rs1.* != rs2.*) branched = true;
+                },
+                0x4 => {
+                    if (@as(i32, @bitCast(rs1.*)) < @as(i32, @bitCast(rs2.*))) branched = true;
+                },
+                0x5 => {
+                    if (@as(i32, @bitCast(rs1.*)) >= @as(i32, @bitCast(rs2.*))) branched = true;
+                },
+                0x6 => {
+                    if (rs1.* < rs2.*) branched = true;
+                },
+                0x7 => {
+                    if (rs1.* >= rs2.*) branched = true;
+                },
+                else => return,
+            }
+            if (branched)
+                core_state.*.pc_reg += @as(u32, @bitCast(@as(i32, @intCast(imm.word_s))));
+        },
         else => return,
     }
 
-    if (!jumped)
+    if (!branched)
         core_state.*.pc_reg += 4;
 
     core_state.*.gp_regs[0] = 0;
