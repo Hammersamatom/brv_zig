@@ -28,12 +28,6 @@ pub fn main() !void {
     const readBytes = try fileHandler.read(memory);
     _ = readBytes;
 
-    //memory[0] = 0x73;
-    //memory[1] = 0x00;
-    //memory[2] = 0x10;
-    //memory[3] = 0x00;
-
-    //var gp_regs: [32]un.reg_un = undefined;
     var core_one: rv.cpu_state = rv.cpu_state{ .pc_reg = 0, .gp_regs = [_]u32{0} ** 32 };
 
     while (true) {
