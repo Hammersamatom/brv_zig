@@ -30,15 +30,18 @@ const inst_types = enum(u7) {
 };
 
 pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
+    const gp_regs: *[32]u32 = &core_state.*.gp_regs;
+    const pc_reg: *u32 = &core_state.*.pc_reg;
+
     const inst: un.instr = un.instr{
         // Converts a slice of 4 u8 into a u32
-        .instruction = std.mem.readVarInt(u32, memory.*[core_state.*.pc_reg .. core_state.*.pc_reg + 4], std.builtin.Endian.little),
+        .instruction = std.mem.readVarInt(u32, memory.*[pc_reg.* .. pc_reg.* + 4], std.builtin.Endian.little),
     };
 
     // Map the references to pointers to avoid a copy
-    const rd: *u32 = &core_state.*.gp_regs[inst.r_type.rd];
-    const rs1: *u32 = &core_state.*.gp_regs[inst.r_type.rs1];
-    const rs2: *u32 = &core_state.*.gp_regs[inst.r_type.rs2];
+    const rd: *u32 = &gp_regs[inst.r_type.rd];
+    const rs1: *u32 = &gp_regs[inst.r_type.rs1];
+    const rs2: *u32 = &gp_regs[inst.r_type.rs2];
 
     var branched: bool = false;
 
@@ -50,15 +53,8 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
             else
                 @as(u32, @bitCast(@as(i32, @intCast(@as(i12, @bitCast(inst.i_type.imm))))));
             switch (inst.i_type.funct3) {
-                //0x0 => switch (inst.r_type.funct7) { // ADD/I / SUB // Can't tell the difference between IMM and REG
-                //    0x00 => rd.* = rs1.* + value,
-                //    0x20 => rd.* = rs1.* - value,
-                //    else => {
-                //        std.debug.print("Invalid instruction (REG, IMM) (ADD/I / SUB): {x}\n", .{inst.r_type.funct7});
-                //    },
-                //},
                 0x0 => {
-                    if (rs2_or_imm == true) // Is Immediate
+                    if (rs2_or_imm == true) // Is Reg
                         switch (inst.r_type.funct7) { // ADD/I / SUB // Can't tell the difference between IMM and REG
                             0x00 => rd.* = rs1.* + value,
                             0x20 => rd.* = rs1.* - value,
@@ -177,7 +173,7 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
                 else => std.debug.panic("Invalid instruction: {x}\n", .{inst.instruction}),
             }
             if (branched)
-                core_state.*.pc_reg += @as(u32, @bitCast(@as(i32, @intCast(imm.word_s))));
+                pc_reg.* += @as(u32, @bitCast(@as(i32, @intCast(imm.word_s))));
         },
         .JAL, .JALR => { // JAL / JALR
             const jal_or_jalr: bool = if ((inst.op_only.opcode & 0b0001000) == 0b0001000) true else false;
@@ -192,23 +188,23 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
                 },
             };
 
-            rd.* = core_state.*.pc_reg + 4;
+            rd.* = pc_reg.* + 4;
             branched = true;
-            core_state.*.pc_reg = rs1.* + if (jal_or_jalr == true)
+            pc_reg.* = rs1.* + if (jal_or_jalr == true)
                 @as(u32, @bitCast(@as(i32, @intCast(imm.word_s))))
             else
                 @as(u32, @bitCast(@as(i32, @intCast(@as(i12, @bitCast(inst.i_type.imm))))));
         },
         .LUI => rd.* = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12), // LUI
-        .AUIPC => rd.* = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12) + core_state.*.pc_reg, //AUIPC
+        .AUIPC => rd.* = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12) + pc_reg.*, //AUIPC
         .SYSTEM => { // SYSTEM
             switch (inst.i_type.imm) {
                 0x0 => return, // ECALL
                 0x1 => {
-                    for (core_state.*.gp_regs, 0..) |reg, index| {
+                    for (gp_regs.*, 0..) |reg, index| {
                         std.debug.print("gp_reg[{}] = {}, {}\n", .{ index, reg, @as(i32, @bitCast(reg)) });
                     }
-                    std.debug.print("pc_reg = {}\n", .{core_state.*.pc_reg});
+                    std.debug.print("pc_reg = {}\n", .{pc_reg.*});
                     std.debug.print("Exiting Simulation", .{});
                     std.process.exit(0);
                 }, // EBREAK
@@ -218,7 +214,7 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
     }
 
     if (!branched)
-        core_state.*.pc_reg += 4;
+        pc_reg.* += 4;
 
-    core_state.*.gp_regs[0] = 0;
+    gp_regs.*[0] = 0;
 }
