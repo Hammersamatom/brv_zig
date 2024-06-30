@@ -52,29 +52,27 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
                 rs2.*
             else
                 @as(u32, @bitCast(@as(i32, @intCast(@as(i12, @bitCast(inst.i_type.imm))))));
-            switch (inst.i_type.funct3) {
-                0x0 => {
-                    if (rs2_or_imm == true) // Is Reg
-                        switch (inst.r_type.funct7) { // ADD/I / SUB // Can't tell the difference between IMM and REG
-                            0x00 => rd.* = rs1.* + value,
-                            0x20 => rd.* = rs1.* - value,
-                            else => std.debug.panic("Invalid instruction (REG, IMM) (ADD / SUB): {x}\n", .{inst.r_type.funct7}),
-                        }
-                    else
-                        rd.* = rs1.* + value;
+            rd.* = switch (inst.i_type.funct3) {
+                0x0 => switch (rs2_or_imm) {
+                    true => switch (inst.r_type.funct7) {
+                        0x00 => rs1.* + value,
+                        0x20 => rs1.* - value,
+                        else => std.debug.panic("Invalid instruction (REG, IMM) (ADD / SUB): {x}\n", .{inst.r_type.funct7}),
+                    },
+                    false => rs1.* + value,
                 },
-                0x4 => rd.* = rs1.* ^ value, // XOR/I
-                0x6 => rd.* = rs1.* | value, // OR/I
-                0x7 => rd.* = rs1.* & value, // AND/I
-                0x1 => rd.* = rs1.* << @intCast(value & 0x1F), // SLL/I
+                0x4 => rs1.* ^ value, // XOR/I
+                0x6 => rs1.* | value, // OR/I
+                0x7 => rs1.* & value, // AND/I
+                0x1 => rs1.* << @intCast(value & 0x1F), // SLL/I
                 0x5 => switch (inst.r_type.funct7) { // SRL/I / SRA/I
-                    0x00 => rd.* = rs1.* >> @truncate(value),
-                    0x20 => rd.* = @as(u32, @bitCast(@as(i32, @bitCast(rs1.*)) >> @truncate(value))),
+                    0x00 => rs1.* >> @truncate(value),
+                    0x20 => @as(u32, @bitCast(@as(i32, @bitCast(rs1.*)) >> @truncate(value))),
                     else => std.debug.panic("Invalid instruction (REG, IMM) (SRL/I / SRA/I): {x}\n", .{inst.r_type.funct7}),
                 },
-                0x2 => rd.* = if (@as(i32, @bitCast(rs1.*)) < @as(i32, @bitCast(value))) 1 else 0, // SLTI (Set Less Than Immediate)
-                0x3 => rd.* = if (rs1.* < value) 1 else 0, // SLTIU (Set Less Than Immediate Unsigned)
-            }
+                0x2 => if (@as(i32, @bitCast(rs1.*)) < @as(i32, @bitCast(value))) 1 else 0, // SLTI (Set Less Than Immediate)
+                0x3 => if (rs1.* < value) 1 else 0, // SLTIU (Set Less Than Immediate Unsigned)
+            };
         },
         .LOAD => { // LOAD
             // Can't you offset backwards?
