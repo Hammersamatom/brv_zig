@@ -47,7 +47,7 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
 
     switch (@as(inst_types, @enumFromInt(inst.op_only.opcode))) {
         .REG, .IMM => { // REG, IMM
-            const rs2_or_imm: bool = if ((inst.op_only.opcode & 0x20) == 0x20) true else false;
+            const rs2_or_imm: bool = (inst.op_only.opcode & 0x20) == 0x20;
             const value = if (rs2_or_imm)
                 rs2.*
             else
@@ -174,7 +174,7 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
                 pc_reg.* += @as(u32, @bitCast(@as(i32, @intCast(imm.word_s))));
         },
         .JAL, .JALR => { // JAL / JALR
-            const jal_or_jalr: bool = if ((inst.op_only.opcode & 0b0001000) == 0b0001000) true else false;
+            const jal_or_jalr: bool = (inst.op_only.opcode & 0b0001000) == 0b0001000;
 
             const imm: un.imm_recon_j = un.imm_recon_j{
                 .imm_j = .{
