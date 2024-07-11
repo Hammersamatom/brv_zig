@@ -59,13 +59,13 @@ const branch_names = enum(u3) {
     BGEU = 0x7,
 };
 
-pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
+pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
     const gp_regs: *[32]u32 = &core_state.*.gp_regs;
     const pc_reg: *u32 = &core_state.*.pc_reg;
 
     const inst: un.instr = un.instr{
         // Converts a slice of 4 u8 into a u32
-        .instruction = std.mem.readVarInt(u32, memory.*[pc_reg.* .. pc_reg.* + 4], std.builtin.Endian.little),
+        .instruction = std.mem.readVarInt(u32, memory[pc_reg.* .. pc_reg.* + 4], std.builtin.Endian.little),
     };
 
     // Map the references to pointers to avoid a copy
@@ -111,32 +111,32 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
             switch (@as(load_names, @enumFromInt(inst.i_type.funct3))) {
                 // LB (Load Byte, sign extended)
                 .LB => {
-                    t.byte[3] = memory.*[ls_offset + 0];
+                    t.byte[3] = memory[ls_offset + 0];
                     rd.* = @as(u32, @bitCast(t.word_s >> 24));
                 },
                 // LH (Load Half, sign-extended)
                 .LH => {
-                    t.byte[3] = memory.*[ls_offset + 1];
-                    t.byte[2] = memory.*[ls_offset + 0];
+                    t.byte[3] = memory[ls_offset + 1];
+                    t.byte[2] = memory[ls_offset + 0];
                     rd.* = @as(u32, @bitCast(t.word_s >> 16));
                 },
                 // LW (Load Word)
                 .LW => {
-                    t.byte[3] = memory.*[ls_offset + 3];
-                    t.byte[2] = memory.*[ls_offset + 2];
-                    t.byte[1] = memory.*[ls_offset + 1];
-                    t.byte[0] = memory.*[ls_offset + 0];
+                    t.byte[3] = memory[ls_offset + 3];
+                    t.byte[2] = memory[ls_offset + 2];
+                    t.byte[1] = memory[ls_offset + 1];
+                    t.byte[0] = memory[ls_offset + 0];
                     rd.* = @as(u32, @bitCast(t.word));
                 },
                 // LHU (Load Half Unsigned)
                 .LHU => {
-                    t.byte[1] = memory.*[ls_offset + 1];
-                    t.byte[0] = memory.*[ls_offset + 0];
+                    t.byte[1] = memory[ls_offset + 1];
+                    t.byte[0] = memory[ls_offset + 0];
                     rd.* = @as(u32, @bitCast(t.word));
                 },
                 // LBU (Load Byte Unsigned)
                 .LBU => {
-                    t.byte[0] = memory.*[ls_offset + 0];
+                    t.byte[0] = memory[ls_offset + 0];
                     rd.* = @as(u32, @bitCast(t.word));
                 },
             }
@@ -153,17 +153,17 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
 
             switch (@as(store_names, @enumFromInt(inst.s_type.funct3))) {
                 .SW => { // SW
-                    memory.*[ls_offset + 3] = t.byte[3];
-                    memory.*[ls_offset + 2] = t.byte[2];
-                    memory.*[ls_offset + 1] = t.byte[1];
-                    memory.*[ls_offset + 0] = t.byte[0];
+                    memory[ls_offset + 3] = t.byte[3];
+                    memory[ls_offset + 2] = t.byte[2];
+                    memory[ls_offset + 1] = t.byte[1];
+                    memory[ls_offset + 0] = t.byte[0];
                 },
                 .SH => { // SH
-                    memory.*[ls_offset + 1] = t.byte[1];
-                    memory.*[ls_offset + 0] = t.byte[0];
+                    memory[ls_offset + 1] = t.byte[1];
+                    memory[ls_offset + 0] = t.byte[0];
                 },
                 .SB => { // SB
-                    memory.*[ls_offset + 0] = t.byte[0];
+                    memory[ls_offset + 0] = t.byte[0];
                 },
             }
         },
