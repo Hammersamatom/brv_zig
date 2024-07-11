@@ -28,6 +28,36 @@ const inst_types = enum(u7) {
     AUIPC = 0b0010111,
     SYSTEM = 0b1110011,
 };
+const reg_imm_names = enum(u3) {
+    ADD_I_SUB = 0x0,
+    SLL_I = 0x1,
+    SLT_I = 0x2,
+    SLT_I_U = 0x3,
+    XOR_I = 0x4,
+    SRL_I_SRA_I = 0x5,
+    OR_I = 0x6,
+    AND_I = 0x7,
+};
+const load_names = enum(u3) {
+    LB = 0x0,
+    LH = 0x1,
+    LW = 0x2,
+    LBU = 0x4,
+    LHU = 0x5,
+};
+const store_names = enum(u3) {
+    SB = 0x0,
+    SH = 0x1,
+    SW = 0x2,
+};
+const branch_names = enum(u3) {
+    BEQ = 0x0,
+    BNE = 0x1,
+    BLT = 0x4,
+    BGE = 0x5,
+    BLTU = 0x6,
+    BGEU = 0x7,
+};
 
 pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
     const gp_regs: *[32]u32 = &core_state.*.gp_regs;
@@ -48,12 +78,12 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
     switch (@as(inst_types, @enumFromInt(inst.op_only.opcode))) {
         .REG, .IMM => { // REG, IMM
             const rs2_or_imm: bool = (inst.op_only.opcode & 0x20) == 0x20;
-            const value = if (rs2_or_imm)
-                rs2.*
-            else
-                @as(u32, @bitCast(@as(i32, @intCast(@as(i12, @bitCast(inst.i_type.imm))))));
-            rd.* = switch (inst.i_type.funct3) {
-                0x0 => switch (rs2_or_imm) {
+            const value: u32 = switch (rs2_or_imm) {
+                true => rs2.*,
+                false => @as(u32, @bitCast(@as(i32, @intCast(@as(i12, @bitCast(inst.i_type.imm)))))),
+            };
+            rd.* = switch (@as(reg_imm_names, @enumFromInt(inst.i_type.funct3))) {
+                .ADD_I_SUB => switch (rs2_or_imm) {
                     true => switch (inst.r_type.funct7) {
                         0x00 => rs1.* + value,
                         0x20 => rs1.* - value,
@@ -61,37 +91,37 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
                     },
                     false => rs1.* + value,
                 },
-                0x4 => rs1.* ^ value, // XOR/I
-                0x6 => rs1.* | value, // OR/I
-                0x7 => rs1.* & value, // AND/I
-                0x1 => rs1.* << @intCast(value & 0x1F), // SLL/I
-                0x5 => switch (inst.r_type.funct7) { // SRL/I / SRA/I
+                .XOR_I => rs1.* ^ value, // XOR/I
+                .OR_I => rs1.* | value, // OR/I
+                .AND_I => rs1.* & value, // AND/I
+                .SLL_I => rs1.* << @intCast(value & 0x1F), // SLL/I
+                .SRL_I_SRA_I => switch (inst.r_type.funct7) { // SRL/I / SRA/I
                     0x00 => rs1.* >> @truncate(value),
                     0x20 => @as(u32, @bitCast(@as(i32, @bitCast(rs1.*)) >> @truncate(value))),
                     else => std.debug.panic("Invalid instruction (REG, IMM) (SRL/I / SRA/I): {x}\n", .{inst.r_type.funct7}),
                 },
-                0x2 => if (@as(i32, @bitCast(rs1.*)) < @as(i32, @bitCast(value))) 1 else 0, // SLTI (Set Less Than Immediate)
-                0x3 => if (rs1.* < value) 1 else 0, // SLTIU (Set Less Than Immediate Unsigned)
+                .SLT_I => if (@as(i32, @bitCast(rs1.*)) < @as(i32, @bitCast(value))) 1 else 0, // SLT/I (Set Less Than Immediate)
+                .SLT_I_U => if (rs1.* < value) 1 else 0, // SLT/I/U (Set Less Than Immediate Unsigned)
             };
         },
         .LOAD => { // LOAD
             // Can't you offset backwards?
             const ls_offset: u32 = rs1.* + @as(u32, @bitCast(@as(i32, @bitCast(inst.instruction)) >> 20));
             var t: component = .{ .word = 0 };
-            switch (inst.i_type.funct3) {
+            switch (@as(load_names, @enumFromInt(inst.i_type.funct3))) {
                 // LB (Load Byte, sign extended)
-                0x0 => {
+                .LB => {
                     t.byte[3] = memory.*[ls_offset + 0];
                     rd.* = @as(u32, @bitCast(t.word_s >> 24));
                 },
                 // LH (Load Half, sign-extended)
-                0x1 => {
+                .LH => {
                     t.byte[3] = memory.*[ls_offset + 1];
                     t.byte[2] = memory.*[ls_offset + 0];
                     rd.* = @as(u32, @bitCast(t.word_s >> 16));
                 },
                 // LW (Load Word)
-                0x2 => {
+                .LW => {
                     t.byte[3] = memory.*[ls_offset + 3];
                     t.byte[2] = memory.*[ls_offset + 2];
                     t.byte[1] = memory.*[ls_offset + 1];
@@ -99,17 +129,16 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
                     rd.* = @as(u32, @bitCast(t.word));
                 },
                 // LHU (Load Half Unsigned)
-                0x5 => {
+                .LHU => {
                     t.byte[1] = memory.*[ls_offset + 1];
                     t.byte[0] = memory.*[ls_offset + 0];
                     rd.* = @as(u32, @bitCast(t.word));
                 },
                 // LBU (Load Byte Unsigned)
-                0x4 => {
+                .LBU => {
                     t.byte[0] = memory.*[ls_offset + 0];
                     rd.* = @as(u32, @bitCast(t.word));
                 },
-                else => std.debug.panic("Invalid instruction: {x}\n", .{inst.instruction}),
             }
         },
         .STORE => { // STORE
@@ -122,21 +151,20 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
             const ls_offset: u32 = rs1.* + @as(u32, @bitCast(@as(i32, @intCast(imm.word_s))));
             const t: component = .{ .word = rs2.* };
 
-            switch (inst.s_type.funct3) {
-                0x2 => { // SW
+            switch (@as(store_names, @enumFromInt(inst.s_type.funct3))) {
+                .SW => { // SW
                     memory.*[ls_offset + 3] = t.byte[3];
                     memory.*[ls_offset + 2] = t.byte[2];
                     memory.*[ls_offset + 1] = t.byte[1];
                     memory.*[ls_offset + 0] = t.byte[0];
                 },
-                0x1 => { // SH
+                .SH => { // SH
                     memory.*[ls_offset + 1] = t.byte[1];
                     memory.*[ls_offset + 0] = t.byte[0];
                 },
-                0x0 => { // SB
+                .SB => { // SB
                     memory.*[ls_offset + 0] = t.byte[0];
                 },
-                else => std.debug.panic("Invalid instruction: {x}\n", .{inst.instruction}),
             }
         },
         .BRANCH => { // BRANCH
@@ -149,27 +177,14 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
                     .unused_1 = 0,
                 },
             };
-            switch (inst.b_type.funct3) {
-                0x0 => {
-                    if (rs1.* == rs2.*) branched = true;
-                },
-                0x1 => {
-                    if (rs1.* != rs2.*) branched = true;
-                },
-                0x4 => {
-                    if (@as(i32, @bitCast(rs1.*)) < @as(i32, @bitCast(rs2.*))) branched = true;
-                },
-                0x5 => {
-                    if (@as(i32, @bitCast(rs1.*)) >= @as(i32, @bitCast(rs2.*))) branched = true;
-                },
-                0x6 => {
-                    if (rs1.* < rs2.*) branched = true;
-                },
-                0x7 => {
-                    if (rs1.* >= rs2.*) branched = true;
-                },
-                else => std.debug.panic("Invalid instruction: {x}\n", .{inst.instruction}),
-            }
+            branched = switch (@as(branch_names, @enumFromInt(inst.b_type.funct3))) {
+                .BEQ => rs1.* == rs2.*,
+                .BNE => rs1.* != rs2.*,
+                .BLT => @as(i32, @bitCast(rs1.*)) < @as(i32, @bitCast(rs2.*)),
+                .BGE => @as(i32, @bitCast(rs1.*)) >= @as(i32, @bitCast(rs2.*)),
+                .BLTU => rs1.* < rs2.*,
+                .BGEU => rs1.* >= rs2.*,
+            };
             if (branched)
                 pc_reg.* += @as(u32, @bitCast(@as(i32, @intCast(imm.word_s))));
         },
@@ -188,13 +203,17 @@ pub fn step_cpu(core_state: *cpu_state, memory: *const []u8) !void {
 
             rd.* = pc_reg.* + 4;
             branched = true;
-            pc_reg.* = rs1.* + if (jal_or_jalr == true)
-                @as(u32, @bitCast(@as(i32, @intCast(imm.word_s))))
-            else
-                @as(u32, @bitCast(@as(i32, @intCast(@as(i12, @bitCast(inst.i_type.imm))))));
+            pc_reg.* = rs1.* + @as(u32, @bitCast(@as(i32, @intCast(switch (jal_or_jalr) {
+                true => imm.word_s,
+                false => @as(i12, @bitCast(inst.i_type.imm)),
+            }))));
         },
         .LUI => rd.* = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12), // LUI
         .AUIPC => rd.* = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12) + pc_reg.*, //AUIPC
+        //.LUI, .AUIPC => rd.* = (inst.instruction & 0xFFFFF000) + switch (@as(inst_types, @enumFromInt(inst.op_only.opcode)) == inst_types.LUI) {
+        //    true => 0,
+        //    false => pc_reg.*,
+        //},
         .SYSTEM => { // SYSTEM
             switch (inst.i_type.imm) {
                 0x0 => return, // ECALL
