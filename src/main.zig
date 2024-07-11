@@ -13,10 +13,7 @@ pub fn main() !void {
     defer std.process.argsFree(allocator, args);
 
     // Get a file handle
-    const fileHandler = try std.fs.cwd().openFile(
-        args[1],
-        .{},
-    );
+    const fileHandler = try std.fs.cwd().openFile(args[1], .{});
     defer fileHandler.close();
 
     // Allocate the memory on the heap. Stack isn't large enough (1 << 23) - (1 << 14).
@@ -31,6 +28,6 @@ pub fn main() !void {
     var core_one: rv.cpu_state = rv.cpu_state{ .pc_reg = 0, .gp_regs = [_]u32{0} ** 32 };
 
     while (true) {
-        try rv.step_cpu(&core_one, &memory);
+        try rv.step_cpu(&core_one, memory);
     }
 }
