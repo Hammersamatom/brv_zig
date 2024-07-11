@@ -1,7 +1,7 @@
 const std = @import("std");
 const un = @import("rv_types.zig");
 
-const component = union {
+const component = extern union {
     word: u32,
     word_s: i32,
     short: [2]u16,
