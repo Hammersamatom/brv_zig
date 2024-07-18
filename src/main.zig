@@ -1,6 +1,7 @@
 const std = @import("std");
 const stdout = std.io.getStdOut().writer();
 const rv = @import("cpu.zig");
+const uart = @import("crappy_uart.zig");
 
 pub fn main() !void {
     // Set up the allocator
@@ -26,8 +27,15 @@ pub fn main() !void {
     _ = readBytes;
 
     var core_one: rv.cpu_state = rv.cpu_state{ .pc_reg = 0, .gp_regs = [_]u32{0} ** 32 };
+    var uart_prop: uart.uart_settings = uart.uart_settings{ .uart_status_address = 0x7f_ff00, .buffer_address = 0x7f_ff01, .counted = 0 };
+
+    const string = [_]u8{ 'h', 'e', 'l', 'l', 'o', ' ', 'w', 'o', 'r', 'l', 'd', '\n' };
+
+    memory[uart_prop.uart_status_address] = string.len;
+    @memcpy(memory.ptr + uart_prop.buffer_address, &string);
 
     while (true) {
         try rv.step_cpu(&core_one, memory);
+        try uart.uart_transmit(&uart_prop, memory);
     }
 }
