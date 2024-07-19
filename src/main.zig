@@ -34,4 +34,9 @@ pub fn main() !void {
         try rv.step_cpu(&core_one, memory);
         try uart.uart_transmit(&uart_prop, memory);
     }
+
+    const outFile = try std.fs.cwd().createFile("memory.bin", .{});
+    defer outFile.close();
+
+    _ = try outFile.write(memory);
 }
