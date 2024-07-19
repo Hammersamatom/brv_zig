@@ -15,38 +15,38 @@ const i_type_str = packed struct {
     rd: u5,
     funct3: u3,
     rs1: u5,
-    imm: u12,
+    imm: i12,
 };
 const s_type_str = packed struct {
     opcode: u7,
-    imm4_0: u5,
+    imm4_0: i5,
     funct3: u3,
     rs1: u5,
     rs2: u5,
-    imm11_5: u7,
+    imm11_5: i7,
 };
 const b_type_str = packed struct {
     opcode: u7,
-    imm11: u1,
-    imm4_1: u4,
+    imm11: i1,
+    imm4_1: i4,
     funct3: u3,
     rs1: u5,
     rs2: u5,
-    imm10_5: u6,
-    imm12: u1,
+    imm10_5: i6,
+    imm12: i1,
 };
 const u_type_str = packed struct {
     opcode: u7,
     rd: u5,
-    imm31_12: u20,
+    imm31_12: i20,
 };
 const j_type_str = packed struct {
     opcode: u7,
     rd: u5,
-    imm19_12: u8,
-    imm11: u1,
-    imm10_1: u10,
-    imm20: u1,
+    imm19_12: i8,
+    imm11: i1,
+    imm10_1: i10,
+    imm20: i1,
 };
 pub const instr = extern union {
     instruction: u32,
@@ -61,22 +61,22 @@ pub const instr = extern union {
 };
 
 const imm_s_str = packed struct {
-    imm4_0: u5,
-    imm11_5: u7,
+    imm4_0: i5,
+    imm11_5: i7,
 };
 const imm_b_str = packed struct {
     unused_1: u1,
-    imm4_1: u4,
-    imm10_5: u6,
-    imm11: u1,
-    imm12: u1,
+    imm4_1: i4,
+    imm10_5: i6,
+    imm11: i1,
+    imm12: i1,
 };
 const imm_j_str = packed struct {
     unused_1: u1,
-    imm10_1: u10,
-    imm11: u1,
-    imm19_12: u8,
-    imm20: u1,
+    imm10_1: i10,
+    imm11: i1,
+    imm19_12: i8,
+    imm20: i1,
 };
 pub const imm_recon_s = packed union {
     word_s: i12,
