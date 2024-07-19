@@ -1,5 +1,6 @@
 const std = @import("std");
 const un = @import("rv_types.zig");
+const print = std.debug.print;
 
 const component = extern union {
     word: u32,
@@ -13,6 +14,7 @@ const component = extern union {
 pub const cpu_state = struct {
     pc_reg: u32,
     gp_regs: [32]u32,
+    halted: bool,
 };
 
 const inst_types = enum(u7) {
@@ -85,11 +87,11 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
             rd.* = switch (@as(reg_imm_names, @enumFromInt(inst.i_type.funct3))) {
                 .ADD_I_SUB => switch (rs2_or_imm) {
                     true => switch (inst.r_type.funct7) {
-                        0x00 => rs1.* + value,
-                        0x20 => rs1.* - value,
+                        0x00 => rs1.* +% value,
+                        0x20 => rs1.* -% value,
                         else => std.debug.panic("Invalid instruction (REG, IMM) (ADD / SUB): {x}\n", .{inst.r_type.funct7}),
                     },
-                    false => rs1.* + value,
+                    false => rs1.* +% value,
                 },
                 .XOR_I => rs1.* ^ value, // XOR/I
                 .OR_I => rs1.* | value, // OR/I
@@ -106,7 +108,7 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
         },
         .LOAD => { // LOAD
             // Can't you offset backwards?
-            const ls_offset: u32 = rs1.* + @as(u32, @bitCast(@as(i32, @bitCast(inst.instruction)) >> 20));
+            const ls_offset: u32 = @as(u32, @bitCast(@as(i32, @bitCast(rs1.*)) +% inst.i_type.imm));
             var t: component = .{ .word = 0 };
             switch (@as(load_names, @enumFromInt(inst.i_type.funct3))) {
                 // LB (Load Byte, sign extended)
@@ -148,7 +150,7 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
                     .imm11_5 = inst.s_type.imm11_5,
                 },
             };
-            const ls_offset: u32 = rs1.* + @as(u32, @bitCast(@as(i32, @intCast(imm.word_s))));
+            const ls_offset: u32 = @as(u32, @bitCast(@as(i32, @bitCast(rs1.*)) +% imm.word_s));
             const t: component = .{ .word = rs2.* };
 
             switch (@as(store_names, @enumFromInt(inst.s_type.funct3))) {
@@ -186,7 +188,7 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
                 .BGEU => rs1.* >= rs2.*,
             };
             if (branched)
-                pc_reg.* += @as(u32, @bitCast(@as(i32, @intCast(imm.word_s))));
+                pc_reg.* +%= @as(u32, @bitCast(@as(i32, @intCast(imm.word_s))));
         },
         .JAL, .JALR => { // JAL / JALR
             const jal_or_jalr: bool = (inst.op_only.opcode & 0b0001000) == 0b0001000;
@@ -201,15 +203,15 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
                 },
             };
 
-            rd.* = pc_reg.* + 4;
+            rd.* = pc_reg.* +% 4;
             branched = true;
-            pc_reg.* = rs1.* + @as(u32, @bitCast(@as(i32, @intCast(switch (jal_or_jalr) {
+            pc_reg.* = rs1.* +% @as(u32, @bitCast(@as(i32, @intCast(switch (jal_or_jalr) {
                 true => imm.word_s,
                 false => @as(i12, @bitCast(inst.i_type.imm)),
             }))));
         },
         .LUI => rd.* = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12), // LUI
-        .AUIPC => rd.* = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12) + pc_reg.*, //AUIPC
+        .AUIPC => rd.* = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12) +% pc_reg.*, //AUIPC
         //.LUI, .AUIPC => rd.* = (inst.instruction & 0xFFFFF000) + switch (@as(inst_types, @enumFromInt(inst.op_only.opcode)) == inst_types.LUI) {
         //    true => 0,
         //    false => pc_reg.*,
@@ -218,12 +220,12 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
             switch (inst.i_type.imm) {
                 0x0 => return, // ECALL
                 0x1 => {
-                    for (gp_regs.*, 0..) |reg, index| {
-                        std.debug.print("gp_reg[{}] = {}, {}\n", .{ index, reg, @as(i32, @bitCast(reg)) });
-                    }
-                    std.debug.print("pc_reg = {}\n", .{pc_reg.*});
-                    std.debug.print("Exiting Simulation", .{});
-                    std.process.exit(0);
+                    //for (gp_regs.*, 0..) |reg, index| {
+                    //    std.debug.print("gp_reg[{}] = {}, {}\n", .{ index, reg, @as(i32, @bitCast(reg)) });
+                    //}
+                    //std.debug.print("pc_reg = {}\n", .{pc_reg.*});
+                    //std.debug.print("Exiting Simulation\n", .{});
+                    core_state.*.halted = true;
                 }, // EBREAK
                 else => std.debug.panic("Invalid instruction: {x}\n", .{inst.instruction}),
             }
