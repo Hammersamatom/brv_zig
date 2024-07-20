@@ -190,9 +190,13 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
             if (branched)
                 pc_reg.* +%= @as(u32, @bitCast(@as(i32, @intCast(imm.word_s))));
         },
-        .JAL, .JALR => { // JAL / JALR
-            const jal_or_jalr: bool = (inst.op_only.opcode & 0b0001000) == 0b0001000;
-
+        .JALR => { // JALR
+            const return_ptr: u32 = pc_reg.* + 4;
+            branched = true;
+            pc_reg.* = @as(u32, @bitCast(@as(i32, @bitCast(rs1.*)) +% inst.i_type.imm));
+            rd.* = return_ptr;
+        },
+        .JAL => { // JAL
             const imm: un.imm_recon_j = un.imm_recon_j{
                 .imm_j = .{
                     .imm20 = inst.j_type.imm20,
@@ -205,10 +209,7 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
 
             rd.* = pc_reg.* +% 4;
             branched = true;
-            pc_reg.* = rs1.* +% @as(u32, @bitCast(@as(i32, @intCast(switch (jal_or_jalr) {
-                true => imm.word_s,
-                false => @as(i12, @bitCast(inst.i_type.imm)),
-            }))));
+            pc_reg.* = @as(u32, @bitCast(@as(i32, @bitCast(pc_reg.*)) +% imm.word_s));
         },
         .LUI => rd.* = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12), // LUI
         .AUIPC => rd.* = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12) +% pc_reg.*, //AUIPC
