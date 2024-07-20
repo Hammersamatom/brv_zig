@@ -1,5 +1,4 @@
 const std = @import("std");
-const stdout = std.io.getStdOut().writer();
 const rv = @import("cpu.zig");
 const types = @import("rv_types.zig");
 const uart = @import("crappy_uart.zig");
