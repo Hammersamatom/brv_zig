@@ -2,63 +2,10 @@ const std = @import("std");
 const un = @import("rv_types.zig");
 const print = std.debug.print;
 
-const component = extern union {
-    word: u32,
-    word_s: i32,
-    short: [2]u16,
-    short_s: [2]i16,
-    byte: [4]u8,
-    byte_s: [4]i8,
-};
-
 pub const cpu_state = struct {
     pc_reg: u32,
     gp_regs: [32]u32,
     halted: bool,
-};
-
-const inst_types = enum(u7) {
-    REG = 0b0110011,
-    IMM = 0b0010011,
-    LOAD = 0b0000011,
-    STORE = 0b0100011,
-    BRANCH = 0b1100011,
-    // Specialized
-    JAL = 0b1101111,
-    JALR = 0b1100111,
-    LUI = 0b0110111,
-    AUIPC = 0b0010111,
-    SYSTEM = 0b1110011,
-};
-const reg_imm_names = enum(u3) {
-    ADD_I_SUB = 0x0,
-    SLL_I = 0x1,
-    SLT_I = 0x2,
-    SLT_I_U = 0x3,
-    XOR_I = 0x4,
-    SRL_I_SRA_I = 0x5,
-    OR_I = 0x6,
-    AND_I = 0x7,
-};
-const load_names = enum(u3) {
-    LB = 0x0,
-    LH = 0x1,
-    LW = 0x2,
-    LBU = 0x4,
-    LHU = 0x5,
-};
-const store_names = enum(u3) {
-    SB = 0x0,
-    SH = 0x1,
-    SW = 0x2,
-};
-const branch_names = enum(u3) {
-    BEQ = 0x0,
-    BNE = 0x1,
-    BLT = 0x4,
-    BGE = 0x5,
-    BLTU = 0x6,
-    BGEU = 0x7,
 };
 
 pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
@@ -77,14 +24,14 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
 
     var branched: bool = false;
 
-    switch (@as(inst_types, @enumFromInt(inst.op_only.opcode))) {
+    switch (@as(un.inst_types, @enumFromInt(inst.op_only.opcode))) {
         .REG, .IMM => { // REG, IMM
             const rs2_or_imm: bool = (inst.op_only.opcode & 0x20) == 0x20;
             const value: u32 = switch (rs2_or_imm) {
                 true => rs2.*,
                 false => @as(u32, @bitCast(@as(i32, @intCast(@as(i12, @bitCast(inst.i_type.imm)))))),
             };
-            rd.* = switch (@as(reg_imm_names, @enumFromInt(inst.i_type.funct3))) {
+            rd.* = switch (@as(un.reg_imm_names, @enumFromInt(inst.i_type.funct3))) {
                 .ADD_I_SUB => switch (rs2_or_imm) {
                     true => switch (inst.r_type.funct7) {
                         0x00 => rs1.* +% value,
@@ -109,8 +56,8 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
         .LOAD => { // LOAD
             // Can't you offset backwards?
             const ls_offset: u32 = @as(u32, @bitCast(@as(i32, @bitCast(rs1.*)) +% inst.i_type.imm));
-            var t: component = .{ .word = 0 };
-            switch (@as(load_names, @enumFromInt(inst.i_type.funct3))) {
+            var t: un.component = .{ .word = 0 };
+            switch (@as(un.load_names, @enumFromInt(inst.i_type.funct3))) {
                 // LB (Load Byte, sign extended)
                 .LB => {
                     t.byte[3] = memory[ls_offset + 0];
@@ -151,9 +98,9 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
                 },
             };
             const ls_offset: u32 = @as(u32, @bitCast(@as(i32, @bitCast(rs1.*)) +% imm.word_s));
-            const t: component = .{ .word = rs2.* };
+            const t: un.component = .{ .word = rs2.* };
 
-            switch (@as(store_names, @enumFromInt(inst.s_type.funct3))) {
+            switch (@as(un.store_names, @enumFromInt(inst.s_type.funct3))) {
                 .SW => { // SW
                     memory[ls_offset + 3] = t.byte[3];
                     memory[ls_offset + 2] = t.byte[2];
@@ -179,7 +126,7 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
                     .unused_1 = 0,
                 },
             };
-            branched = switch (@as(branch_names, @enumFromInt(inst.b_type.funct3))) {
+            branched = switch (@as(un.branch_names, @enumFromInt(inst.b_type.funct3))) {
                 .BEQ => rs1.* == rs2.*,
                 .BNE => rs1.* != rs2.*,
                 .BLT => @as(i32, @bitCast(rs1.*)) < @as(i32, @bitCast(rs2.*)),
