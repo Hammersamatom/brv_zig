@@ -28,8 +28,16 @@ pub fn main() !void {
     const readBytes = try fileHandler.read(memory);
     _ = readBytes;
 
-    var core_one: rv.cpu_state = rv.cpu_state{ .pc_reg = 0, .gp_regs = [_]u32{0} ** 32, .halted = false };
-    var uart_prop: uart.uart_settings = uart.uart_settings{ .uart_status_address = 0x7f_ff00, .buffer_address = 0x7f_ff04, .counted = 0 };
+    var core_one: rv.cpu_state = .{ //rv.cpu_state{
+        .pc_reg = 0,
+        .gp_regs = [_]u32{0} ** 32,
+        .halted = false,
+    };
+    var uart_prop: uart.uart_settings = .{ //uart.uart_settings{
+        .uart_status_address = 0x7f_ff00,
+        .buffer_address = 0x7f_ff04,
+        .counted = 0,
+    };
 
     while (true) {
         if (core_one.halted == false) {
