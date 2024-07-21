@@ -132,12 +132,14 @@ pub const abi: [32][]const u8 = [_][]const u8{
 };
 
 pub const component = extern union {
-    word: u32,
-    word_s: i32,
-    short: [2]u16,
-    short_s: [2]i16,
-    byte: [4]u8,
-    byte_s: [4]i8,
+    dword: u64,
+    dword_s: i64,
+    word: [2]u32,
+    word_s: [2]i32,
+    short: [4]u16,
+    short_s: [4]i16,
+    byte: [8]u8,
+    byte_s: [8]i8,
 };
 
 pub const inst_types = enum(u7) {
@@ -182,4 +184,14 @@ pub const branch_names = enum(u3) {
     BGE = 0x5,
     BLTU = 0x6,
     BGEU = 0x7,
+};
+pub const mul_names = enum(u3) {
+    MUL = 0x0,
+    MULH = 0x1,
+    MULHSU = 0x2,
+    MULHU = 0x3,
+    DIV = 0x4,
+    DIVU = 0x5,
+    REM = 0x6,
+    REMU = 0x7,
 };

@@ -1,5 +1,5 @@
 const std = @import("std");
-const un = @import("rv_types.zig");
+const un = @import("../rv_types.zig");
 const print = std.debug.print;
 
 pub const cpu_state = struct {
@@ -56,18 +56,18 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
         .LOAD => { // LOAD
             // Can't you offset backwards?
             const ls_offset: u32 = @as(u32, @bitCast(@as(i32, @bitCast(rs1.*)) +% inst.i_type.imm));
-            var t: un.component = .{ .word = 0 };
+            var t: un.component = .{ .dword = 0 };
             switch (@as(un.load_names, @enumFromInt(inst.i_type.funct3))) {
                 // LB (Load Byte, sign extended)
                 .LB => {
                     t.byte[3] = memory[ls_offset + 0];
-                    rd.* = @as(u32, @bitCast(t.word_s >> 24));
+                    rd.* = @as(u32, @bitCast(t.word_s[0] >> 24));
                 },
                 // LH (Load Half, sign-extended)
                 .LH => {
                     t.byte[3] = memory[ls_offset + 1];
                     t.byte[2] = memory[ls_offset + 0];
-                    rd.* = @as(u32, @bitCast(t.word_s >> 16));
+                    rd.* = @as(u32, @bitCast(t.word_s[0] >> 16));
                 },
                 // LW (Load Word)
                 .LW => {
@@ -75,18 +75,18 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
                     t.byte[2] = memory[ls_offset + 2];
                     t.byte[1] = memory[ls_offset + 1];
                     t.byte[0] = memory[ls_offset + 0];
-                    rd.* = @as(u32, @bitCast(t.word));
+                    rd.* = @as(u32, @bitCast(t.word[0]));
                 },
                 // LHU (Load Half Unsigned)
                 .LHU => {
                     t.byte[1] = memory[ls_offset + 1];
                     t.byte[0] = memory[ls_offset + 0];
-                    rd.* = @as(u32, @bitCast(t.word));
+                    rd.* = @as(u32, @bitCast(t.word[0]));
                 },
                 // LBU (Load Byte Unsigned)
                 .LBU => {
                     t.byte[0] = memory[ls_offset + 0];
-                    rd.* = @as(u32, @bitCast(t.word));
+                    rd.* = @as(u32, @bitCast(t.word[0]));
                 },
             }
         },
@@ -98,7 +98,7 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
                 },
             };
             const ls_offset: u32 = @as(u32, @bitCast(@as(i32, @bitCast(rs1.*)) +% imm.word_s));
-            const t: un.component = .{ .word = rs2.* };
+            const t: un.component = .{ .dword = rs2.* };
 
             switch (@as(un.store_names, @enumFromInt(inst.s_type.funct3))) {
                 .SW => { // SW

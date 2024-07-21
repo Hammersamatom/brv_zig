@@ -1,5 +1,5 @@
 const std = @import("std");
-const rv = @import("cpu.zig");
+const rv = @import("cores/rv32im.zig");
 const types = @import("rv_types.zig");
 const uart = @import("crappy_uart.zig");
 
@@ -38,6 +38,10 @@ pub fn main() !void {
         .counted = 0,
     };
 
+    var cycle_count: f64 = 0;
+
+    const start_time = std.time.milliTimestamp();
+
     while (true) {
         if (core_one.halted == false) {
             //std.debug.print("\npc_reg: {x:>10}", .{core_one.pc_reg});
@@ -47,12 +51,17 @@ pub fn main() !void {
             //}
             //std.debug.print("\n", .{});
             try rv.step_cpu(&core_one, memory);
+            cycle_count += 1;
         }
         try uart.uart_transmit(&uart_prop, memory);
         //_ = try std.io.getStdIn().reader().readByte();
         if (core_one.halted == true and memory[uart_prop.uart_status_address] == 0)
             break;
     }
+
+    const new_time = @as(f64, @floatFromInt(std.time.milliTimestamp() - start_time)) / 1000;
+    std.debug.print("Total cycle count: {d}\nTime taken: {d}\n", .{ cycle_count, new_time });
+    std.debug.print("Estimated MHz: {d}\n", .{cycle_count / new_time});
 
     const outFile = try std.fs.cwd().createFile("memory.bin", .{});
     defer outFile.close();
