@@ -1,11 +1,9 @@
 const std = @import("std");
 const un = @import("../rv_types.zig");
-const print = std.debug.print;
 
 pub const cpu_state = struct {
     pc_reg: un.reg_un,
     gp_regs: [32]un.reg_un,
-    halted: bool,
 };
 
 pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
@@ -156,32 +154,21 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
 
             rd.*.word = pc_reg.*.word +% 4;
             branched = true;
-            pc_reg.*.word_s = pc_reg.*.word_s +% imm.word_s;
+            pc_reg.*.word_s +%= imm.word_s;
         },
         .LUI => rd.*.word = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12), // LUI
         .AUIPC => rd.*.word = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12) +% pc_reg.*.word, //AUIPC
-        //.LUI, .AUIPC => rd.* = (inst.instruction & 0xFFFFF000) + switch (@as(inst_types, @enumFromInt(inst.op_only.opcode)) == inst_types.LUI) {
-        //    true => 0,
-        //    false => pc_reg.*,
-        //},
         .SYSTEM => { // SYSTEM
             switch (inst.i_type.imm) {
                 0x0 => return, // ECALL
-                0x1 => {
-                    //for (gp_regs.*, 0..) |reg, index| {
-                    //    std.debug.print("gp_reg[{}] = {}, {}\n", .{ index, reg, @as(i32, @bitCast(reg)) });
-                    //}
-                    //std.debug.print("pc_reg = {}\n", .{pc_reg.*});
-                    //std.debug.print("Exiting Simulation\n", .{});
-                    core_state.*.halted = true;
-                }, // EBREAK
+                0x1 => return, // EBREAK
                 else => std.debug.panic("Invalid instruction: {x}\n", .{inst.instruction}),
             }
         },
     }
 
     if (!branched)
-        pc_reg.*.word += 4;
+        pc_reg.*.word +%= 4;
 
     gp_regs.*[0].word = 0;
 }
