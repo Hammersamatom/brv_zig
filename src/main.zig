@@ -1,5 +1,5 @@
 const std = @import("std");
-const rv = @import("cores/rv32im.zig");
+const rv = @import("cores/rv32i.zig");
 const types = @import("rv_types.zig");
 const uart = @import("crappy_uart.zig");
 
@@ -28,8 +28,8 @@ pub fn main() !void {
     _ = readBytes;
 
     var core_one: rv.cpu_state = .{ //rv.cpu_state{
-        .pc_reg = 0,
-        .gp_regs = [_]u32{0} ** 32,
+        .pc_reg = .{ .word = 0 },
+        .gp_regs = [_]types.reg_un{types.reg_un{ .word = 0 }} ** 32,
         .halted = false,
     };
     var uart_prop: uart.uart_settings = .{ //uart.uart_settings{

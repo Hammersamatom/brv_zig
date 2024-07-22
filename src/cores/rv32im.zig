@@ -3,8 +3,8 @@ const un = @import("../rv_types.zig");
 const print = std.debug.print;
 
 pub const cpu_state = struct {
-    pc_reg: u32,
-    gp_regs: [32]u32,
+    pc_reg: un.reg_un,
+    gp_regs: [32]un.reg_un,
     halted: bool,
 };
 
@@ -40,18 +40,18 @@ fn mulhu(a: u32, b: u32) u32 {
 }
 
 pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
-    const gp_regs: *[32]u32 = &core_state.*.gp_regs;
-    const pc_reg: *u32 = &core_state.*.pc_reg;
+    const gp_regs: *[32]un.reg_un = &core_state.*.gp_regs;
+    const pc_reg: *un.reg_un = &core_state.*.pc_reg;
 
     const inst: un.instr = un.instr{
         // Converts a slice of 4 u8 into a u32
-        .instruction = std.mem.readVarInt(u32, memory[pc_reg.* .. pc_reg.* + 4], std.builtin.Endian.little),
+        .instruction = std.mem.readVarInt(u32, memory[pc_reg.*.word .. pc_reg.*.word + 4], std.builtin.Endian.little),
     };
 
     // Map the references to pointers to avoid a copy
-    const rd: *u32 = &gp_regs[inst.r_type.rd];
-    const rs1: *u32 = &gp_regs[inst.r_type.rs1];
-    const rs2: *u32 = &gp_regs[inst.r_type.rs2];
+    const rd: *un.reg_un = &gp_regs[inst.r_type.rd];
+    const rs1: *un.reg_un = &gp_regs[inst.r_type.rs1];
+    const rs2: *un.reg_un = &gp_regs[inst.r_type.rs2];
 
     var branched: bool = false;
 
@@ -60,58 +60,58 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
             const rs2_or_imm: bool = (inst.op_only.opcode & 0x20) == 0x20;
             const is_mul: bool = (rs2_or_imm and inst.r_type.funct7 & 0x01 != 0); // If it's a .REG and the funct7 == 0x01
             const value: u32 = switch (rs2_or_imm) {
-                true => rs2.*,
+                true => rs2.*.word,
                 false => @as(u32, @bitCast(@as(i32, @intCast(@as(i12, @bitCast(inst.i_type.imm)))))),
             };
-            rd.* = switch (is_mul) {
+            rd.*.word = switch (is_mul) {
                 false => switch (@as(un.reg_imm_names, @enumFromInt(inst.i_type.funct3))) {
                     .ADD_I_SUB => switch (rs2_or_imm) {
                         true => switch (inst.r_type.funct7) {
-                            0x00 => rs1.* +% value,
-                            0x20 => rs1.* -% value,
+                            0x00 => rs1.*.word +% value,
+                            0x20 => rs1.*.word -% value,
                             else => std.debug.panic("Invalid instruction (REG, IMM) (ADD / SUB): {x}\n", .{inst.r_type.funct7}),
                         },
-                        false => rs1.* +% value,
+                        false => rs1.*.word +% value,
                     },
-                    .XOR_I => rs1.* ^ value, // XOR/I
-                    .OR_I => rs1.* | value, // OR/I
-                    .AND_I => rs1.* & value, // AND/I
-                    .SLL_I => rs1.* << @intCast(value & 0x1F), // SLL/I
+                    .XOR_I => rs1.*.word ^ value, // XOR/I
+                    .OR_I => rs1.*.word | value, // OR/I
+                    .AND_I => rs1.*.word & value, // AND/I
+                    .SLL_I => rs1.*.word << @intCast(value & 0x1F), // SLL/I
                     .SRL_I_SRA_I => switch (inst.r_type.funct7) { // SRL/I / SRA/I
-                        0x00 => rs1.* >> @truncate(value),
-                        0x20 => @as(u32, @bitCast(@as(i32, @bitCast(rs1.*)) >> @truncate(value))),
+                        0x00 => rs1.*.word >> @truncate(value),
+                        0x20 => @as(u32, @bitCast(rs1.*.word_s >> @truncate(value))),
                         else => std.debug.panic("Invalid instruction (REG, IMM) (SRL/I / SRA/I): {x}\n", .{inst.r_type.funct7}),
                     },
-                    .SLT_I => if (@as(i32, @bitCast(rs1.*)) < @as(i32, @bitCast(value))) 1 else 0, // SLT/I (Set Less Than Immediate)
-                    .SLT_I_U => if (rs1.* < value) 1 else 0, // SLT/I/U (Set Less Than Immediate Unsigned)
+                    .SLT_I => if (rs1.*.word_s < @as(i32, @bitCast(value))) 1 else 0, // SLT/I (Set Less Than Immediate)
+                    .SLT_I_U => if (rs1.*.word < value) 1 else 0, // SLT/I/U (Set Less Than Immediate Unsigned)
                 },
                 true => switch (@as(un.mul_names, @enumFromInt(inst.i_type.funct3))) {
-                    .MUL => mul(rs1.*, rs2.*),
-                    .MULH => mulh(rs1.*, rs2.*),
-                    .MULHSU => mulhsu(rs1.*, rs2.*),
-                    .MULHU => mulhu(rs1.*, rs2.*),
-                    .DIV => @as(u32, @bitCast(@divFloor(@as(i32, @bitCast(rs1.*)), @as(i32, @bitCast(rs2.*))))),
-                    .DIVU => rs1.* / rs2.*,
-                    .REM => @as(u32, @bitCast(@rem(@as(i32, @bitCast(rs1.*)), @as(i32, @bitCast(rs2.*))))),
-                    .REMU => rs1.* % rs2.*,
+                    .MUL => mul(rs1.*.word, rs2.*.word),
+                    .MULH => mulh(rs1.*.word, rs2.*.word),
+                    .MULHSU => mulhsu(rs1.*.word, rs2.*.word),
+                    .MULHU => mulhu(rs1.*.word, rs2.*.word),
+                    .DIV => @as(u32, @bitCast(@divFloor(rs1.*.word_s, rs2.*.word_s))),
+                    .DIVU => rs1.*.word / rs2.*.word,
+                    .REM => @as(u32, @bitCast(@rem(rs1.*.word_s, rs2.*.word_s))),
+                    .REMU => rs1.*.word % rs2.*.word,
                 },
             };
         },
         .LOAD => { // LOAD
             // Can't you offset backwards?
-            const ls_offset: u32 = @as(u32, @bitCast(@as(i32, @bitCast(rs1.*)) +% inst.i_type.imm));
+            const ls_offset: u32 = @as(u32, @bitCast(rs1.*.word_s +% inst.i_type.imm));
             var t: un.component = .{ .dword = 0 };
             switch (@as(un.load_names, @enumFromInt(inst.i_type.funct3))) {
                 // LB (Load Byte, sign extended)
                 .LB => {
                     t.byte[3] = memory[ls_offset + 0];
-                    rd.* = @as(u32, @bitCast(t.word_s[0] >> 24));
+                    rd.*.word_s = t.word_s[0] >> 24;
                 },
                 // LH (Load Half, sign-extended)
                 .LH => {
                     t.byte[3] = memory[ls_offset + 1];
                     t.byte[2] = memory[ls_offset + 0];
-                    rd.* = @as(u32, @bitCast(t.word_s[0] >> 16));
+                    rd.*.word_s = t.word_s[0] >> 16;
                 },
                 // LW (Load Word)
                 .LW => {
@@ -119,18 +119,18 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
                     t.byte[2] = memory[ls_offset + 2];
                     t.byte[1] = memory[ls_offset + 1];
                     t.byte[0] = memory[ls_offset + 0];
-                    rd.* = @as(u32, @bitCast(t.word[0]));
+                    rd.*.word = t.word[0];
                 },
                 // LHU (Load Half Unsigned)
                 .LHU => {
                     t.byte[1] = memory[ls_offset + 1];
                     t.byte[0] = memory[ls_offset + 0];
-                    rd.* = @as(u32, @bitCast(t.word[0]));
+                    rd.*.word = t.word[0];
                 },
                 // LBU (Load Byte Unsigned)
                 .LBU => {
                     t.byte[0] = memory[ls_offset + 0];
-                    rd.* = @as(u32, @bitCast(t.word[0]));
+                    rd.*.word = t.word[0];
                 },
             }
         },
@@ -141,8 +141,8 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
                     .imm11_5 = inst.s_type.imm11_5,
                 },
             };
-            const ls_offset: u32 = @as(u32, @bitCast(@as(i32, @bitCast(rs1.*)) +% imm.word_s));
-            const t: un.component = .{ .dword = rs2.* };
+            const ls_offset: u32 = @as(u32, @bitCast(rs1.*.word_s +% imm.word_s));
+            const t: un.component = .{ .dword = rs2.*.word };
 
             switch (@as(un.store_names, @enumFromInt(inst.s_type.funct3))) {
                 .SW => { // SW
@@ -171,21 +171,21 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
                 },
             };
             branched = switch (@as(un.branch_names, @enumFromInt(inst.b_type.funct3))) {
-                .BEQ => rs1.* == rs2.*,
-                .BNE => rs1.* != rs2.*,
-                .BLT => @as(i32, @bitCast(rs1.*)) < @as(i32, @bitCast(rs2.*)),
-                .BGE => @as(i32, @bitCast(rs1.*)) >= @as(i32, @bitCast(rs2.*)),
-                .BLTU => rs1.* < rs2.*,
-                .BGEU => rs1.* >= rs2.*,
+                .BEQ => rs1.*.word == rs2.*.word,
+                .BNE => rs1.*.word != rs2.*.word,
+                .BLT => rs1.*.word_s < rs2.*.word_s,
+                .BGE => rs1.*.word_s >= rs2.*.word_s,
+                .BLTU => rs1.*.word < rs2.*.word,
+                .BGEU => rs1.*.word >= rs2.*.word,
             };
             if (branched)
-                pc_reg.* +%= @as(u32, @bitCast(@as(i32, @intCast(imm.word_s))));
+                pc_reg.*.word_s +%= imm.word_s;
         },
         .JALR => { // JALR
-            const return_ptr: u32 = pc_reg.* + 4;
+            const return_ptr: u32 = pc_reg.*.word + 4;
             branched = true;
-            pc_reg.* = @as(u32, @bitCast(@as(i32, @bitCast(rs1.*)) +% inst.i_type.imm));
-            rd.* = return_ptr;
+            pc_reg.*.word_s = rs1.*.word_s +% inst.i_type.imm;
+            rd.*.word = return_ptr;
         },
         .JAL => { // JAL
             const imm: un.imm_recon_j = un.imm_recon_j{
@@ -198,12 +198,12 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
                 },
             };
 
-            rd.* = pc_reg.* +% 4;
+            rd.*.word = pc_reg.*.word +% 4;
             branched = true;
-            pc_reg.* = @as(u32, @bitCast(@as(i32, @bitCast(pc_reg.*)) +% imm.word_s));
+            pc_reg.*.word_s = pc_reg.*.word_s +% imm.word_s;
         },
-        .LUI => rd.* = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12), // LUI
-        .AUIPC => rd.* = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12) +% pc_reg.*, //AUIPC
+        .LUI => rd.*.word = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12), // LUI
+        .AUIPC => rd.*.word = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12) +% pc_reg.*.word, //AUIPC
         //.LUI, .AUIPC => rd.* = (inst.instruction & 0xFFFFF000) + switch (@as(inst_types, @enumFromInt(inst.op_only.opcode)) == inst_types.LUI) {
         //    true => 0,
         //    false => pc_reg.*,
@@ -225,7 +225,7 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
     }
 
     if (!branched)
-        pc_reg.* += 4;
+        pc_reg.*.word += 4;
 
-    gp_regs.*[0] = 0;
+    gp_regs.*[0].word = 0;
 }
