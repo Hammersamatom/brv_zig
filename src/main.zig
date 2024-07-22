@@ -39,17 +39,19 @@ pub fn main() !void {
 
     var cycle_count: f64 = 0;
 
-    const start_time = std.time.milliTimestamp();
+    var last_pc_reg: u32 = undefined;
 
     while (true) {
         try rv.step_cpu(&core_one, memory);
         cycle_count += 1;
         try uart.uart_transmit(&uart_prop, memory);
-    }
 
-    const new_time = @as(f64, @floatFromInt(std.time.milliTimestamp() - start_time)) / 1000;
-    std.debug.print("Total cycle count: {d}\nTime taken: {d}\n", .{ cycle_count, new_time });
-    std.debug.print("Estimated MHz: {d}\n", .{cycle_count / new_time});
+        // Exit if in a loop, and UART is empty
+        if (core_one.pc_reg.word == last_pc_reg and memory[uart_prop.uart_status_address] == 0)
+            break;
+        // Save last pc_reg for break loop
+        last_pc_reg = core_one.pc_reg.word;
+    }
 
     const outFile = try std.fs.cwd().createFile("memory.bin", .{});
     defer outFile.close();
