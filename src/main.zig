@@ -30,7 +30,6 @@ pub fn main() !void {
     var core_one: rv.cpu_state = .{ //rv.cpu_state{
         .pc_reg = .{ .word = 0 },
         .gp_regs = [_]types.reg_un{types.reg_un{ .word = 0 }} ** 32,
-        .halted = false,
     };
     var uart_prop: uart.uart_settings = .{ //uart.uart_settings{
         .uart_status_address = 0x7f_ff00,
@@ -43,20 +42,9 @@ pub fn main() !void {
     const start_time = std.time.milliTimestamp();
 
     while (true) {
-        if (core_one.halted == false) {
-            //std.debug.print("\npc_reg: {x:>10}", .{core_one.pc_reg});
-            //for (core_one.gp_regs, 0..) |reg, i| {
-            //    if (i % 2 == 0) std.debug.print("\n", .{});
-            //    std.debug.print("{s:<6}: {:<10} 0x{x:<10}", .{ types.abi[i], reg, reg });
-            //}
-            //std.debug.print("\n", .{});
-            try rv.step_cpu(&core_one, memory);
-            cycle_count += 1;
-        }
+        try rv.step_cpu(&core_one, memory);
+        cycle_count += 1;
         try uart.uart_transmit(&uart_prop, memory);
-        //_ = try std.io.getStdIn().reader().readByte();
-        if (core_one.halted == true and memory[uart_prop.uart_status_address] == 0)
-            break;
     }
 
     const new_time = @as(f64, @floatFromInt(std.time.milliTimestamp() - start_time)) / 1000;
