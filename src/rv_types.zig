@@ -91,9 +91,9 @@ pub const imm_recon_j = packed union {
     imm_j: imm_j_str,
 };
 
-pub const reg_un = extern union {
-    word: u32,
-    word_s: i32,
+pub const reg = extern union {
+    u: u32,
+    i: i32,
 };
 
 pub const abi: [32][]const u8 = [_][]const u8{

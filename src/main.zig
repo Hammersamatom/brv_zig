@@ -1,5 +1,5 @@
 const std = @import("std");
-const rv = @import("cores/rv32i.zig");
+const rv = @import("cores/rv32im.zig");
 const types = @import("rv_types.zig");
 const uart = @import("crappy_uart.zig");
 
@@ -28,8 +28,8 @@ pub fn main() !void {
     _ = readBytes;
 
     var core_one: rv.cpu_state = .{ //rv.cpu_state{
-        .pc_reg = .{ .word = 0 },
-        .gp_regs = [_]types.reg_un{types.reg_un{ .word = 0 }} ** 32,
+        .pc_reg = .{ .u = 0 },
+        .gp_regs = [_]types.reg{types.reg{ .u = 0 }} ** 32,
     };
     var uart_prop: uart.uart_settings = .{ //uart.uart_settings{
         .uart_status_address = 0x7f_ff00,
@@ -47,10 +47,10 @@ pub fn main() !void {
         try uart.uart_transmit(&uart_prop, memory);
 
         // Exit if in a loop, and UART is empty
-        if (core_one.pc_reg.word == last_pc_reg and memory[uart_prop.uart_status_address] == 0)
+        if (core_one.pc_reg.u == last_pc_reg and memory[uart_prop.uart_status_address] == 0)
             break;
         // Save last pc_reg for break loop
-        last_pc_reg = core_one.pc_reg.word;
+        last_pc_reg = core_one.pc_reg.u;
     }
 
     const outFile = try std.fs.cwd().createFile("memory.bin", .{});
