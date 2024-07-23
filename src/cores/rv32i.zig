@@ -137,7 +137,7 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
                 pc_reg.*.i +%= imm.word_s;
         },
         .JALR => { // JALR
-            const return_ptr: u32 = pc_reg.*.u + 4;
+            const return_ptr: u32 = pc_reg.*.u +% 4;
             branched = true;
             pc_reg.*.i = rs1.*.i +% inst.i_type.imm;
             rd.*.u = return_ptr;
