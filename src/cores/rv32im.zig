@@ -201,8 +201,8 @@ pub fn step_cpu(core_state: *cpu_state, memory: []u8) !void {
             branched = true;
             pc_reg.*.i +%= imm.word_s;
         },
-        .LUI => rd.*.u = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12), // LUI
-        .AUIPC => rd.*.u = (@as(u32, @intCast(inst.u_type.imm31_12)) << 12) +% pc_reg.*.u, //AUIPC
+        .LUI => rd.*.u = inst.instruction & 0xFFFF_F000, // LUI
+        .AUIPC => rd.*.u = (inst.instruction & 0xFFFF_F000) +% pc_reg.*.u, //AUIPC
         .SYSTEM => { // SYSTEM
             switch (inst.i_type.imm) {
                 0x0 => return, // ECALL
