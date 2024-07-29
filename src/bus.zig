@@ -1,5 +1,6 @@
 const std = @import("std");
 const types = @import("rv_types.zig");
+const uart = @import("16550.zig").uart;
 
 //pub const bus = struct {
 //    mem_size: u32,
@@ -34,9 +35,11 @@ pub fn Bus(comptime mem_size: usize) type {
     return struct {
         const Self = @This();
         mem: []u8,
+        uart: *uart,
 
         pub fn writeByte(self: Self, address: u32, byte: u8) void {
             switch (address) {
+                0x1000_0000...0x1000_0000 + 0x8 - 1 => self.uart.*.writeUartReg(@as(u3, @truncate(address - 0x1000_0000)), byte),
                 0x8000_0000...0x8000_0000 + mem_size - 1 => self.mem[address - 0x8000_0000] = byte,
                 else => return,
             }
@@ -44,6 +47,7 @@ pub fn Bus(comptime mem_size: usize) type {
 
         pub fn readByte(self: Self, address: u32) u8 {
             return switch (address) {
+                0x1000_0000...0x1000_0000 + 0x8 - 1 => self.uart.*.readUartReg(@as(u3, @truncate(address - 0x1000_0000))),
                 0x8000_0000...0x8000_0000 + mem_size - 1 => self.mem[address - 0x8000_0000],
                 else => return 0,
             };

@@ -1,7 +1,7 @@
 const std = @import("std");
 const rv = @import("cores/rv32im.zig");
 const types = @import("rv_types.zig");
-const uart = @import("crappy_uart.zig");
+const uart = @import("16550.zig");
 const Bus = @import("bus.zig").Bus;
 
 pub fn main() !void {
@@ -32,25 +32,20 @@ pub fn main() !void {
         .pc_reg = .{ .u = 0x8000_0000 },
         .gp_regs = [_]types.reg{types.reg{ .u = 0 }} ** 32,
     };
-    var uart_prop: uart.uart_settings = .{ //uart.uart_settings{
-        .uart_status_address = 0x7f_ff00,
-        .buffer_address = 0x7f_ff04,
-        .counted = 0,
-    };
 
     var cycle_count: f64 = 0;
-
-    const bus = Bus(mem_max){ .mem = memory };
+    var uart_local = uart.uart.init(7372800);
+    const bus = Bus(mem_max){ .mem = memory, .uart = &uart_local };
 
     var last_pc_reg: u32 = undefined;
 
     while (true) {
         try rv.step_cpu(&core_one, &bus);
         cycle_count += 1;
-        try uart.uart_transmit(&uart_prop, memory);
+        try uart_local.transmit();
 
         // Exit if in a loop, and UART is empty
-        if (core_one.pc_reg.u == last_pc_reg and memory[uart_prop.uart_status_address] == 0)
+        if (core_one.pc_reg.u == last_pc_reg and uart_local.lsr.raw == 0x60)
             break;
         // Save last pc_reg for break loop
         last_pc_reg = core_one.pc_reg.u;
