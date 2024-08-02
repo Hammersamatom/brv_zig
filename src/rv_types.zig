@@ -50,6 +50,7 @@ const j_type_str = packed struct {
 };
 pub const instr = extern union {
     instruction: u32,
+    instr_shorts: [2]u16,
     instr_bytes: [4]u8,
     op_only: op_only_str,
     r_type: r_type_str,
