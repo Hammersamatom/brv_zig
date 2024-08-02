@@ -3,41 +3,12 @@ const un = @import("../rv_types.zig");
 const reg = un.reg;
 const Bus = @import("../bus.zig").Bus;
 
+const m = @import("extensions/m.zig");
+
 pub const cpu_state = struct {
     pc_reg: reg,
     gp_regs: [32]reg,
 };
-
-fn mul(a: u32, b: u32) u32 {
-    const component: un.component = .{
-        .dword_s = @as(i32, @bitCast(a)) * @as(i32, @bitCast(b)),
-    };
-    return component.word[0];
-}
-
-fn mulh(a: u32, b: u32) u32 {
-    const component: un.component = .{
-        .dword_s = @as(i32, @bitCast(a)) * @as(i32, @bitCast(b)),
-    };
-    return component.word[1];
-}
-
-fn mulhsu(a: u32, b: u32) u32 {
-    const rs1: i64 = @as(i32, @bitCast(a));
-    const rs2: i64 = @as(i64, @bitCast(@as(u64, @intCast(b))));
-    const component: un.component = .{
-        .dword_s = rs1 * rs2,
-    };
-
-    return component.word[1];
-}
-
-fn mulhu(a: u32, b: u32) u32 {
-    const component: un.component = .{
-        .dword = a * b,
-    };
-    return component.word[1];
-}
 
 pub fn step_cpu(core_state: *cpu_state, mem_bus: *const Bus(1 << 23)) !void {
     const gp_regs: *[32]reg = &core_state.*.gp_regs;
@@ -91,14 +62,14 @@ pub fn step_cpu(core_state: *cpu_state, mem_bus: *const Bus(1 << 23)) !void {
                     .SLT_I_U => if (rs1.*.u < value) 1 else 0, // SLT/I/U (Set Less Than Immediate Unsigned)
                 },
                 true => switch (@as(un.mul_names, @enumFromInt(inst.i_type.funct3))) {
-                    .MUL => mul(rs1.*.u, rs2.*.u),
-                    .MULH => mulh(rs1.*.u, rs2.*.u),
-                    .MULHSU => mulhsu(rs1.*.u, rs2.*.u),
-                    .MULHU => mulhu(rs1.*.u, rs2.*.u),
-                    .DIV => @as(u32, @bitCast(@divFloor(rs1.*.i, rs2.*.i))),
-                    .DIVU => rs1.*.u / rs2.*.u,
-                    .REM => @as(u32, @bitCast(@rem(rs1.*.i, rs2.*.i))),
-                    .REMU => rs1.*.u % rs2.*.u,
+                    .MUL => m.mul(rs1.*.u, rs2.*.u),
+                    .MULH => m.mulh(rs1.*.u, rs2.*.u),
+                    .MULHSU => m.mulhsu(rs1.*.u, rs2.*.u),
+                    .MULHU => m.mulhu(rs1.*.u, rs2.*.u),
+                    .DIV => m.div(rs1.*.i, rs2.*.i),
+                    .DIVU => m.divu(rs1.*.u, rs2.*.u),
+                    .REM => m.rem(rs1.*.i, rs2.*.i),
+                    .REMU => m.remu(rs1.*.u, rs2.*.u),
                 },
             };
         },
