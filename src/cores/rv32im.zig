@@ -44,13 +44,7 @@ pub fn step_cpu(core_state: *cpu_state, mem_bus: *const Bus(1 << 23)) !void {
     const pc_reg: *reg = &core_state.*.pc_reg;
 
     const inst: un.instr = un.instr{
-        // Converts a slice of 4 u8 into a u32
-        .instr_bytes = .{
-            mem_bus.*.readByte(pc_reg.*.u + 0),
-            mem_bus.*.readByte(pc_reg.*.u + 1),
-            mem_bus.*.readByte(pc_reg.*.u + 2),
-            mem_bus.*.readByte(pc_reg.*.u + 3),
-        },
+        .instruction = mem_bus.*.read32(pc_reg.*.u),
     };
 
     // Map the references to pointers to avoid a copy
@@ -109,32 +103,26 @@ pub fn step_cpu(core_state: *cpu_state, mem_bus: *const Bus(1 << 23)) !void {
             switch (@as(un.load_names, @enumFromInt(inst.i_type.funct3))) {
                 // LB (Load Byte, sign extended)
                 .LB => {
-                    t.byte[3] = mem_bus.*.readByte(ls_offset + 0);
+                    t.byte[3] = mem_bus.*.read8(ls_offset + 0);
                     rd.*.i = t.word_s[0] >> 24;
                 },
                 // LH (Load Half, sign-extended)
                 .LH => {
-                    t.byte[3] = mem_bus.*.readByte(ls_offset + 1);
-                    t.byte[2] = mem_bus.*.readByte(ls_offset + 0);
+                    t.short[1] = mem_bus.*.read16(ls_offset);
                     rd.*.i = t.word_s[0] >> 16;
                 },
                 // LW (Load Word)
                 .LW => {
-                    t.byte[3] = mem_bus.*.readByte(ls_offset + 3);
-                    t.byte[2] = mem_bus.*.readByte(ls_offset + 2);
-                    t.byte[1] = mem_bus.*.readByte(ls_offset + 1);
-                    t.byte[0] = mem_bus.*.readByte(ls_offset + 0);
-                    rd.*.u = t.word[0];
+                    rd.*.u = mem_bus.*.read32(ls_offset); //t.word[0];
                 },
                 // LHU (Load Half Unsigned)
                 .LHU => {
-                    t.byte[1] = mem_bus.*.readByte(ls_offset + 1);
-                    t.byte[0] = mem_bus.*.readByte(ls_offset + 0);
+                    t.short[0] = mem_bus.*.read16(ls_offset);
                     rd.*.u = t.word[0];
                 },
                 // LBU (Load Byte Unsigned)
                 .LBU => {
-                    t.byte[0] = mem_bus.*.readByte(ls_offset + 0);
+                    t.byte[0] = mem_bus.*.read8(ls_offset + 0);
                     rd.*.u = t.word[0];
                 },
             }
@@ -151,17 +139,13 @@ pub fn step_cpu(core_state: *cpu_state, mem_bus: *const Bus(1 << 23)) !void {
 
             switch (@as(un.store_names, @enumFromInt(inst.s_type.funct3))) {
                 .SW => { // SW
-                    mem_bus.*.writeByte(ls_offset + 3, t.byte[3]);
-                    mem_bus.*.writeByte(ls_offset + 2, t.byte[2]);
-                    mem_bus.*.writeByte(ls_offset + 1, t.byte[1]);
-                    mem_bus.*.writeByte(ls_offset + 0, t.byte[0]);
+                    mem_bus.*.write32(ls_offset, t.word[0]);
                 },
                 .SH => { // SH
-                    mem_bus.*.writeByte(ls_offset + 1, t.byte[1]);
-                    mem_bus.*.writeByte(ls_offset + 0, t.byte[0]);
+                    mem_bus.*.write16(ls_offset, t.short[0]);
                 },
                 .SB => { // SB
-                    mem_bus.*.writeByte(ls_offset + 0, t.byte[0]);
+                    mem_bus.*.write8(ls_offset + 0, t.byte[0]);
                 },
             }
         },
