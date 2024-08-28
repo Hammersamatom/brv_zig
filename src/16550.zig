@@ -2,7 +2,6 @@
 // https://caro.su/msx/ocm_de1/16550.pdf
 const std = @import("std");
 const time = std.time;
-const stdprint = std.io.getStdOut().writer();
 
 const rhr_register = extern union {
     raw: u8,
@@ -333,14 +332,14 @@ pub const uart = struct {
         };
     }
 
-    pub fn transmit(self: *uart) !void {
+    pub fn transmit(self: *uart, writer: std.fs.File.Writer) !void {
         const current_time = time.nanoTimestamp();
         // Only transmit if current time is greater than or equal to time_last + time_delta
         if (current_time < self.*.f_time_last + self.*.f_time_delta) return;
         // Hold register is empt*.y, return early
         if (self.*.lsr.interp.thr_empty == 1 and self.*.lsr.interp.transmitter_empty == 1) return;
         // Push contents of THR register onto stdout
-        try stdprint.print("{c}", .{self.*.thr.raw});
+        try writer.print("{c}", .{self.*.thr.raw});
         // Clear the THR register
         self.*.thr.raw = 0;
         // Set the empty bits in LSR register for transmission
@@ -349,6 +348,13 @@ pub const uart = struct {
 
         // Reset time_last and begin cycle anew
         self.*.f_time_last = current_time;
+    }
+
+    pub fn receive(self: *uart, reader: std.fs.File.Reader) !void {
+        // Receive Holding Register is full, exit early.
+        if (self.*.lsr.interp.data_ready == 1) return;
+        self.*.rhr.raw = try reader.readByte();
+        self.*.lsr.interp.data_ready = 1;
     }
 };
 
