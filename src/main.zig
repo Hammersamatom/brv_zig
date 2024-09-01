@@ -5,9 +5,20 @@ const uart = @import("16550.zig");
 const Bus = @import("bus.zig").Bus;
 
 fn ttyRawMode(tty: std.fs.File, termios: *std.posix.termios) !void {
+    termios.iflag.IGNBRK = false;
+    termios.iflag.BRKINT = false;
+    termios.iflag.PARMRK = false;
+    termios.iflag.ISTRIP = false;
+    termios.iflag.INLCR = false;
+    termios.iflag.IGNCR = false;
+    termios.iflag.ICRNL = false;
+    termios.iflag.IXON = false;
+
     termios.lflag.ICANON = false;
     termios.lflag.ECHO = false;
     termios.lflag.ECHONL = false;
+    termios.lflag.ECHOE = false;
+    termios.lflag.IEXTEN = false;
     try std.posix.tcsetattr(tty.handle, .FLUSH, termios.*);
 }
 
