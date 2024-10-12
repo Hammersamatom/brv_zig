@@ -39,7 +39,7 @@ fn mulhu(a: u32, b: u32) u32 {
     return component.word[1];
 }
 
-pub fn step_cpu(core_state: *cpu_state, mem_bus: *const Bus(1 << 23)) !void {
+pub fn step_cpu(core_state: *cpu_state, mem_bus: *const Bus) !void {
     const gp_regs: *[32]reg = &core_state.*.gp_regs;
     const pc_reg: *reg = &core_state.*.pc_reg;
 
