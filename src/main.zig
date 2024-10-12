@@ -14,6 +14,8 @@ fn ttyRawMode(tty: std.fs.File, termios: *std.posix.termios) !void {
     termios.iflag.ICRNL = false;
     termios.iflag.IXON = false;
 
+    termios.oflag.ONLCR = false; // Do not map \n to \r\n
+
     termios.lflag.ICANON = false;
     termios.lflag.ECHO = false;
     termios.lflag.ECHONL = false;
