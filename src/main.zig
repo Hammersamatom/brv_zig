@@ -71,7 +71,7 @@ pub fn main() !void {
 
     var cycle_count: f64 = 0;
     var uart_local = uart.uart.init(7372800);
-    const bus = Bus(mem_max){ .mem = memory, .uart = &uart_local };
+    const bus = Bus{ .m_uart = &uart_local, .m_mem = &memory };
 
     var last_pc_reg: u32 = undefined;
 
