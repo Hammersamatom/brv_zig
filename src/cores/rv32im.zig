@@ -8,34 +8,34 @@ pub const cpu_state = struct {
     gp_regs: [32]reg,
 };
 
-fn mul(a: u32, b: u32) u32 {
+fn mul(a: reg, b: reg) u32 {
     const component: un.component = .{
-        .dword_s = @as(i32, @bitCast(a)) * @as(i32, @bitCast(b)),
+        .dword_s = a.i *% b.i,
     };
     return component.word[0];
 }
 
-fn mulh(a: u32, b: u32) u32 {
+fn mulh(a: reg, b: reg) u32 {
     const component: un.component = .{
-        .dword_s = @as(i32, @bitCast(a)) * @as(i32, @bitCast(b)),
+        .dword_s = a.i *% b.i,
     };
     return component.word[1];
 }
 
-fn mulhsu(a: u32, b: u32) u32 {
-    const rs1: i64 = @as(i32, @bitCast(a));
-    const rs2: i64 = @as(i64, @bitCast(@as(u64, @intCast(b))));
+fn mulhu(a: reg, b: reg) u32 {
     const component: un.component = .{
-        .dword_s = rs1 * rs2,
+        .dword = @as(u64, a.u) *% @as(u64, b.u),
     };
-
     return component.word[1];
 }
 
-fn mulhu(a: u32, b: u32) u32 {
+fn mulhsu(a: reg, b: reg) u32 {
+    const rs1: i33 = a.i;
+    const rs2: i33 = @bitCast(@as(u33, b.u));
     const component: un.component = .{
-        .dword = a * b,
+        .dword_s = rs1 *% rs2,
     };
+
     return component.word[1];
 }
 
@@ -85,10 +85,10 @@ pub fn step_cpu(core_state: *cpu_state, mem_bus: *const Bus) !void {
                     .SLT_I_U => if (rs1.*.u < value) 1 else 0, // SLT/I/U (Set Less Than Immediate Unsigned)
                 },
                 true => switch (@as(un.mul_names, @enumFromInt(inst.i_type.funct3))) {
-                    .MUL => mul(rs1.*.u, rs2.*.u),
-                    .MULH => mulh(rs1.*.u, rs2.*.u),
-                    .MULHSU => mulhsu(rs1.*.u, rs2.*.u),
-                    .MULHU => mulhu(rs1.*.u, rs2.*.u),
+                    .MUL => mul(rs1.*, rs2.*),
+                    .MULH => mulh(rs1.*, rs2.*),
+                    .MULHSU => mulhsu(rs1.*, rs2.*),
+                    .MULHU => mulhu(rs1.*, rs2.*),
                     .DIV => @as(u32, @bitCast(@divFloor(rs1.*.i, rs2.*.i))),
                     .DIVU => rs1.*.u / rs2.*.u,
                     .REM => @as(u32, @bitCast(@rem(rs1.*.i, rs2.*.i))),
