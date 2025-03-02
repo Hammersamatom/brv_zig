@@ -1,6 +1,7 @@
 // Specifications
 // https://caro.su/msx/ocm_de1/16550.pdf
 const std = @import("std");
+const mutex = std.Thread.Mutex;
 const time = std.time;
 
 const rhr_register = extern union {
@@ -126,6 +127,7 @@ const psd_register = extern union {
 };
 
 pub const uart = struct {
+    locked: mutex,
     f_clk: i128,
     f_baud: f64,
     f_time_delta: i128,
@@ -165,6 +167,7 @@ pub const uart = struct {
 
     pub fn init(f_clk_in: i128) uart {
         var temp = uart{
+            .locked = .{},
             .f_clk = f_clk_in,
             .f_baud = 0.0,
             .f_time_delta = 0.0,
@@ -314,7 +317,10 @@ pub const uart = struct {
         return switch (reg_select) {
             0b000 => switch (self.*.lcr.interp.dlab) {
                 0 => enc: {
+                    // Preventative locking to avoid a potential race condition
+                    self.*.locked.lock();
                     self.*.lsr.interp.data_ready = 0;
+                    self.*.locked.unlock();
                     break :enc self.*.rhr.raw;
                 },
                 1 => self.*.dll.raw,
@@ -354,7 +360,10 @@ pub const uart = struct {
         // Receive Holding Register is full, exit early.
         if (self.*.lsr.interp.data_ready == 1) return;
         self.*.rhr.raw = try reader.readByte();
+        // Lock and unlock the mutex, to avoid a race condition that locks up the program
+        self.*.locked.lock();
         self.*.lsr.interp.data_ready = 1;
+        self.*.locked.unlock();
     }
 };
 
